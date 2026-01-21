@@ -9,14 +9,23 @@ A Cloudflare Workers prototype that aggregates product feedback, analyzes it wit
 
 **[cloudflare-feedback-digest.alexandraboico2027.workers.dev](https://cloudflare-feedback-digest.alexandraboico2027.workers.dev)**
 
+## How to Demo (30 sec)
+
+1. Open `/` to view the January 21 daily digest UI
+2. Hit `/run-digest` to generate a fresh digest and store it in D1
+3. Refresh `/` or hit `/latest-digest` to confirm it was persisted
+4. (Optional) Hit `/trigger-workflow` to demonstrate orchestration via Cloudflare Workflows
+
 ## Overview
 
-This project simulates a daily feedback digest pipeline for a PM on the D1 database team. It:
+This prototype simulates a daily feedback digest pipeline for a PM on the D1 database team. It uses **seeded sample data** to simulate noisy feedback from GitHub, Discord, Twitter, and Support tickets.
 
-1. **Collects** raw feedback from multiple sources (Discord, Twitter, GitHub Issues, Support Tickets)
+The pipeline:
+
+1. **Collects** raw feedback from D1 (seeded with realistic sample data)
 2. **Analyzes** feedback using Workers AI (Llama 3) to extract themes, sentiment, and feature signals
-3. **Stores** digests in a D1 database for historical tracking
-4. **Delivers** formatted summaries to Slack (logged in prototype)
+3. **Stores** digests in D1 for historical tracking
+4. **Delivers** formatted summaries to Slack (simulated—payloads are logged, no OAuth required)
 
 ## Tech Stack
 
@@ -85,6 +94,9 @@ CREATE TABLE daily_digests (
                         │  Slack (logged) │
                         └─────────────────┘
 ```
+
+- **Cron trigger** — A real scheduled workflow runs daily at 9am UTC. In this prototype, you can also trigger it manually via `/trigger-workflow` to demonstrate the orchestration.
+- **Slack delivery** — Simulated in this prototype. The formatted Block Kit payload is logged to the console rather than sent via webhook.
 
 ## Local Development
 

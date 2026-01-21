@@ -292,7 +292,7 @@ JSON response:`;
     <p class="subtitle">Made by Alexandra Boico</p>
     <p class="subtitle">A daily feedback digest for a PM on the D1 team. Analyzes the last 24 hours of noisy user feedback using Workers AI, stores digests in D1, and Workflows orchestrates the pipeline to deliver to Slack.</p>
     <p class="subtitle"><strong>Tech stack:</strong> Workers · D1 · Workers AI · Workflows</p>
-    <p class="subtitle" style="color: #f97316; margin-top: 1rem;">⚠️ Sample digest for January 21 — this would be delivered to Slack daily.</p>
+    <p class="subtitle" style="color: #f97316; margin-top: 1rem;">This page displays a simulated daily digest for January 21, as it would appear when delivered to Slack.</p>
     <p style="color: #666; font-size: 0.9rem; margin: 1rem 0 1.5rem;">50 items analyzed from Discord, Twitter, GitHub Issues, Support Tickets</p>
 
     <div class="section">
@@ -358,6 +358,7 @@ JSON response:`;
         <li><a href="/latest-digest">/latest-digest</a> — Get latest digest (JSON)</li>
         <li><a href="/trigger-workflow">/trigger-workflow</a> — Trigger scheduled workflow</li>
       </ul>
+      <p style="color: #666; font-size: 0.8rem; margin-top: 1rem;">Slack delivery is mocked in this prototype; payloads are logged for demonstration.</p>
     </div>
   </div>
 </body>
