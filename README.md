@@ -7,7 +7,7 @@ A Cloudflare Workers prototype that aggregates product feedback, analyzes it wit
 
 ## Live Demo
 
-**[cloudflare-feedback-digest.sashaboris.workers.dev](https://cloudflare-feedback-digest.sashaboris.workers.dev)**
+**[cloudflare-feedback-digest.alexandraboico2027.workers.dev](https://cloudflare-feedback-digest.alexandraboico2027.workers.dev)**
 
 ## Overview
 
