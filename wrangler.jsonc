@@ -9,6 +9,16 @@
 	"compatibility_date": "2025-09-27",
 	"observability": {
 		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "feedback_digest_db",
+			"database_id": "a3bc7431-93a5-479b-98f7-898f460fd24e"
+		}
+	],
+	"ai": {
+		"binding": "AI"
 	}
 	/**
 	 * Smart Placement
