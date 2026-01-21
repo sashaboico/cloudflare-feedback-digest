@@ -253,13 +253,7 @@ JSON response:`;
 			});
 		}
 
-		// Landing page with description and latest digest
-		const latestDigest = await env.DB.prepare(
-			'SELECT * FROM daily_digests ORDER BY created_at DESC LIMIT 1'
-		).first();
-
-		const digest = latestDigest ? JSON.parse(latestDigest.summary) : null;
-
+		// Landing page with static digest for January 21
 		const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -272,11 +266,9 @@ JSON response:`;
     body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #e5e5e5; line-height: 1.6; padding: 2rem; }
     .container { max-width: 800px; margin: 0 auto; }
     h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; color: #fff; }
-    .subtitle { color: #888; font-size: 1rem; margin-bottom: 2rem; }
-    .tech { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
-    .tag { background: #1a1a1a; border: 1px solid #333; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.8rem; color: #f97316; }
+    .subtitle { color: #888; font-size: 1rem; margin-bottom: 0.5rem; }
     .section { background: #111; border: 1px solid #222; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-    .section-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .section-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 1rem; }
     .theme { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #222; }
     .theme:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .theme-name { font-weight: 600; color: #fff; }
@@ -290,9 +282,6 @@ JSON response:`;
     .list { list-style: none; }
     .list li { padding: 0.5rem 0; border-bottom: 1px solid #222; }
     .list li:last-child { border-bottom: none; }
-    .actions { display: grid; gap: 0.75rem; }
-    .action-category { font-size: 0.75rem; text-transform: uppercase; color: #f97316; margin-bottom: 0.25rem; }
-    .meta { display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.85rem; color: #888; }
     a { color: #f97316; text-decoration: none; }
     a:hover { text-decoration: underline; }
   </style>
@@ -300,65 +289,67 @@ JSON response:`;
 <body>
   <div class="container">
     <h1>🗄️ Daily Feedback Digest</h1>
-    <p class="subtitle">Made by Alexandra Boico — A daily feedback digest for a PM on the D1 team. Takes noisy feedback from D1 users, analyzes it using Workers AI, stores digests in a D1 table, and Workflows orchestrates the pipeline to deliver to Slack.</p>
+    <p class="subtitle">Made by Alexandra Boico</p>
+    <p class="subtitle">A daily feedback digest for a PM on the D1 team. Analyzes the last 24 hours of noisy user feedback using Workers AI, stores digests in D1, and Workflows orchestrates the pipeline to deliver to Slack.</p>
     <p class="subtitle"><strong>Tech stack:</strong> Workers · D1 · Workers AI · Workflows</p>
-    <p class="subtitle" style="color: #f97316;">⚠️ This digest corresponds to ${digest?.metadata?.date || new Date(latestDigest?.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) || 'today'} and would be delivered to Slack.</p>
-
-    <div class="tech">
-      <span class="tag">Cloudflare Workers</span>
-      <span class="tag">Workers AI</span>
-      <span class="tag">D1 Database</span>
-      <span class="tag">Workflows</span>
-    </div>
-
-    ${digest ? `
-    <div class="meta" style="margin-bottom: 1.5rem;">
-      <span>📅 ${digest.metadata?.date || 'Today'}</span>
-      <span>📊 ${latestDigest.feedback_count} items analyzed</span>
-      <span>🕐 Updated ${latestDigest.created_at}</span>
-    </div>
+    <p class="subtitle" style="color: #f97316; margin-top: 1rem;">⚠️ Sample digest for January 21 — this would be delivered to Slack daily.</p>
+    <p style="color: #666; font-size: 0.9rem; margin: 1rem 0 1.5rem;">50 items analyzed from Discord, Twitter, GitHub Issues, Support Tickets</p>
 
     <div class="section">
       <div class="section-title">🔥 Top Themes</div>
-      ${digest.top_themes.map(t => `
-        <div class="theme">
-          <div class="theme-name">${t.theme}</div>
-          <div class="theme-meta">${t.mentions} mentions · Impact: ${t.impact} · Confidence: ${t.confidence}</div>
-          ${t.quotes?.slice(0, 2).map(q => `<div class="quote">"${q}"</div>`).join('') || ''}
-        </div>
-      `).join('')}
+      <div class="theme">
+        <div class="theme-name">Performance</div>
+        <div class="theme-meta">13 mentions · High impact</div>
+        <div class="quote">"Batch inserts over 500 rows timeout frequently"</div>
+        <div class="quote">"JOIN performance needs work — query with 3 tables takes 800ms"</div>
+      </div>
+      <div class="theme">
+        <div class="theme-name">Feature Requests</div>
+        <div class="theme-meta">11 mentions · High impact</div>
+        <div class="quote">"Please add full-text search. Using LIKE queries on 100k rows is painfully slow."</div>
+        <div class="quote">"Would pay extra for automatic point-in-time backups."</div>
+      </div>
+      <div class="theme">
+        <div class="theme-name">Documentation Gaps</div>
+        <div class="theme-meta">5 mentions · Medium impact</div>
+        <div class="quote">"Concurrency docs are unclear — getting SQLITE_BUSY errors"</div>
+        <div class="quote">"Connection pooling documentation is nonexistent"</div>
+      </div>
     </div>
 
     <div class="section">
-      <div class="section-title">😬 Sentiment Breakdown</div>
+      <div class="section-title">📊 Sentiment</div>
       <div class="sentiment-bar">
-        <div class="sentiment-frustrated" style="width: ${digest.sentiment.frustrated}%"></div>
-        <div class="sentiment-neutral" style="width: ${digest.sentiment.neutral}%"></div>
-        <div class="sentiment-positive" style="width: ${digest.sentiment.positive}%"></div>
+        <div class="sentiment-frustrated" style="width: 20%"></div>
+        <div class="sentiment-neutral" style="width: 35%"></div>
+        <div class="sentiment-positive" style="width: 45%"></div>
       </div>
       <div class="sentiment-labels">
-        <span>😠 Frustrated ${digest.sentiment.frustrated}%</span>
-        <span>😐 Neutral ${digest.sentiment.neutral}%</span>
-        <span>😊 Positive ${digest.sentiment.positive}%</span>
+        <span>😠 Frustrated 20%</span>
+        <span>😐 Neutral 35%</span>
+        <span>😊 Positive 45%</span>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">💡 Feature Signals</div>
       <ul class="list">
-        ${digest.feature_signals.map(f => `<li>${f}</li>`).join('')}
+        <li>Full-text search</li>
+        <li>Row-level security</li>
+        <li>JSON columns and JSON path queries</li>
+        <li>Automatic backups</li>
+        <li>Read replicas for global latency</li>
       </ul>
     </div>
 
     <div class="section">
-      <div class="section-title">✅ PM Actions</div>
-      <div class="actions">
-        ${digest.pm_actions.docs_ux?.length ? `<div><div class="action-category">Docs / UX</div>${digest.pm_actions.docs_ux.map(a => `<div>${a}</div>`).join('')}</div>` : ''}
-        ${digest.pm_actions.validation?.length ? `<div><div class="action-category">Validation</div>${digest.pm_actions.validation.map(a => `<div>${a}</div>`).join('')}</div>` : ''}
-        ${digest.pm_actions.tracking?.length ? `<div><div class="action-category">Tracking</div>${digest.pm_actions.tracking.map(a => `<div>${a}</div>`).join('')}</div>` : ''}
-      </div>
+      <div class="section-title">✅ Recommended Actions</div>
+      <ul class="list">
+        <li>Improve documentation for concurrency and connection pooling</li>
+        <li>Investigate batch insert timeouts and optimize write performance</li>
+        <li>Validate demand for full-text search with user interviews</li>
+      </ul>
     </div>
-    ` : '<p>No digest available yet. <a href="/run-digest">Generate one</a>.</p>'}
 
     <div class="section" style="background: transparent; border: 1px dashed #333;">
       <div class="section-title">🔗 API Endpoints</div>
