@@ -19,6 +19,16 @@
 	],
 	"ai": {
 		"binding": "AI"
+	},
+	"workflows": [
+		{
+			"name": "digest-workflow",
+			"binding": "DIGEST_WORKFLOW",
+			"class_name": "DigestWorkflow"
+		}
+	],
+	"triggers": {
+		"crons": ["0 9 * * *"]
 	}
 	/**
 	 * Smart Placement
