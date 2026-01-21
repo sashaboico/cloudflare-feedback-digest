@@ -5,7 +5,7 @@ export class DigestWorkflow extends WorkflowEntrypoint {
 	async run(event, step) {
 		const feedback = await step.do('fetch-feedback', async () => {
 			const { results } = await this.env.DB.prepare(
-				'SELECT content FROM feedback ORDER BY created_at DESC LIMIT 20'
+				'SELECT content, source FROM feedback ORDER BY created_at DESC LIMIT 50'
 			).all();
 			return results;
 		});
@@ -14,32 +14,58 @@ export class DigestWorkflow extends WorkflowEntrypoint {
 			return { status: 'skipped', reason: 'No feedback to analyze' };
 		}
 
-		const digest = await step.do('analyze-with-ai', async () => {
-			const feedbackText = feedback.map((f, i) => `${i + 1}. ${f.content}`).join('\n');
-			const prompt = `Analyze this product feedback and respond with valid JSON only:
+		const sources = [...new Set(feedback.map(f => f.source).filter(Boolean))];
+		const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+		const digest = await step.do('analyze-with-ai', async () => {
+			const feedbackText = feedback.map((f, i) => `${i + 1}. [${f.source || 'unknown'}] ${f.content}`).join('\n');
+			const prompt = `You are a PM analyzing product feedback for Cloudflare D1 database. Analyze this feedback and return valid JSON only.
+
+FEEDBACK:
 ${feedbackText}
 
-Return JSON with:
-- top_themes: array of 3 main themes
-- overall_sentiment: "positive", "neutral", or "negative"
-- recommended_actions: array of 2-3 action items
+Return this exact JSON structure:
+{
+  "top_themes": [
+    {"theme": "theme name", "mentions": number, "quotes": ["quote1", "quote2"], "impact": "High/Medium/Low", "confidence": "High/Medium/Low"}
+  ],
+  "friction_points": [
+    {"point": "description", "count": number}
+  ],
+  "sentiment": {
+    "frustrated": number,
+    "neutral": number,
+    "positive": number,
+    "trend": "up/down/stable"
+  },
+  "feature_signals": ["implicit feature request 1", "implicit feature request 2"],
+  "pm_actions": {
+    "docs_ux": ["action 1"],
+    "validation": ["action 1"],
+    "tracking": ["action 1"]
+  }
+}
 
 JSON response:`;
 
 			const aiResponse = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
 				messages: [{ role: 'user', content: prompt }],
-				max_tokens: 512,
+				max_tokens: 1500,
 			});
 
 			try {
 				const jsonMatch = aiResponse.response.match(/\{[\s\S]*\}/);
-				return JSON.parse(jsonMatch[0]);
+				const parsed = JSON.parse(jsonMatch[0]);
+				parsed.metadata = { date: today, sources, feedback_count: feedback.length };
+				return parsed;
 			} catch {
 				return {
-					top_themes: ['Unable to parse themes'],
-					overall_sentiment: 'neutral',
-					recommended_actions: ['Review AI response manually'],
+					top_themes: [{ theme: 'Unable to parse', mentions: 0, quotes: [], impact: 'Unknown', confidence: 'Low' }],
+					friction_points: [],
+					sentiment: { frustrated: 0, neutral: 100, positive: 0, trend: 'stable' },
+					feature_signals: [],
+					pm_actions: { docs_ux: ['Review AI response manually'], validation: [], tracking: [] },
+					metadata: { date: today, sources, feedback_count: feedback.length },
 				};
 			}
 		});
@@ -52,12 +78,15 @@ JSON response:`;
 
 		await step.do('notify-slack', async () => {
 			const slackPayload = {
-				text: `📊 *Daily Feedback Digest*`,
+				text: `🗄️ D1 Feedback Digest — ${today}`,
 				blocks: [
-					{ type: 'header', text: { type: 'plain_text', text: '📊 Daily Feedback Digest' } },
-					{ type: 'section', text: { type: 'mrkdwn', text: `*Sentiment:* ${digest.overall_sentiment}\n*Feedback analyzed:* ${feedback.length}` } },
-					{ type: 'section', text: { type: 'mrkdwn', text: `*Top Themes:*\n${digest.top_themes.map(t => `• ${t}`).join('\n')}` } },
-					{ type: 'section', text: { type: 'mrkdwn', text: `*Recommended Actions:*\n${digest.recommended_actions.map(a => `• ${a}`).join('\n')}` } },
+					{ type: 'header', text: { type: 'plain_text', text: `🗄️ D1 Feedback Digest — ${today}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*Sources:* ${sources.join(', ')}\n*Volume:* ${feedback.length} feedback items analyzed` } },
+					{ type: 'divider' },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*🔥 Top Themes*\n${digest.top_themes.map((t, i) => `${i + 1}. *${t.theme}* (${t.mentions} mentions) — Impact: ${t.impact}`).join('\n')}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*😬 Sentiment*\n😠 Frustrated: ${digest.sentiment.frustrated}%\n😐 Neutral: ${digest.sentiment.neutral}%\n😊 Positive: ${digest.sentiment.positive}%` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*💡 Feature Signals*\n${digest.feature_signals.map(f => `• ${f}`).join('\n')}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*✅ PM Actions*\n${digest.pm_actions.docs_ux.map(a => `• ${a}`).join('\n')}` } },
 				],
 			};
 			console.log('[SLACK] Would send:', JSON.stringify(slackPayload, null, 2));
@@ -77,9 +106,9 @@ export default {
 		const url = new URL(request.url);
 
 		if (url.pathname === '/run-digest') {
-			// Fetch recent feedback
+			// Fetch recent feedback with sources
 			const { results: feedback } = await env.DB.prepare(
-				'SELECT content FROM feedback ORDER BY created_at DESC LIMIT 20'
+				'SELECT content, source FROM feedback ORDER BY created_at DESC LIMIT 50'
 			).all();
 
 			if (feedback.length === 0) {
@@ -89,72 +118,82 @@ export default {
 				});
 			}
 
-			const feedbackText = feedback.map((f, i) => `${i + 1}. ${f.content}`).join('\n');
+			const sources = [...new Set(feedback.map(f => f.source).filter(Boolean))];
+			const feedbackText = feedback.map((f, i) => `${i + 1}. [${f.source || 'unknown'}] ${f.content}`).join('\n');
+			const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-			const prompt = `Analyze this product feedback and respond with valid JSON only:
+			const prompt = `You are a PM analyzing product feedback for Cloudflare D1 database. Analyze this feedback and return valid JSON only.
 
+FEEDBACK:
 ${feedbackText}
 
-Return JSON with:
-- top_themes: array of 3 main themes
-- overall_sentiment: "positive", "neutral", or "negative"
-- recommended_actions: array of 2-3 action items
+Return this exact JSON structure:
+{
+  "top_themes": [
+    {"theme": "theme name", "mentions": number, "quotes": ["quote1", "quote2"], "impact": "High/Medium/Low", "confidence": "High/Medium/Low"}
+  ],
+  "friction_points": [
+    {"point": "description", "count": number}
+  ],
+  "sentiment": {
+    "frustrated": number,
+    "neutral": number,
+    "positive": number,
+    "trend": "up/down/stable"
+  },
+  "feature_signals": ["implicit feature request 1", "implicit feature request 2"],
+  "pm_actions": {
+    "docs_ux": ["action 1"],
+    "validation": ["action 1"],
+    "tracking": ["action 1"]
+  }
+}
 
 JSON response:`;
 
 			const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
 				messages: [{ role: 'user', content: prompt }],
-				max_tokens: 512,
+				max_tokens: 1500,
 			});
 
 			let digest;
 			try {
-				// Extract JSON object from response
 				const jsonMatch = aiResponse.response.match(/\{[\s\S]*\}/);
 				digest = JSON.parse(jsonMatch[0]);
 			} catch {
 				digest = {
-					top_themes: ['Unable to parse themes'],
-					overall_sentiment: 'neutral',
-					recommended_actions: ['Review AI response manually'],
+					top_themes: [{ theme: 'Unable to parse', mentions: 0, quotes: [], impact: 'Unknown', confidence: 'Low' }],
+					friction_points: [],
+					sentiment: { frustrated: 0, neutral: 100, positive: 0, trend: 'stable' },
+					feature_signals: [],
+					pm_actions: { docs_ux: ['Review AI response manually'], validation: [], tracking: [] },
 					raw_response: aiResponse.response,
 				};
 			}
+
+			// Add metadata
+			digest.metadata = {
+				date: today,
+				sources: sources,
+				feedback_count: feedback.length,
+			};
 
 			// Store in daily_digests
 			await env.DB.prepare(
 				'INSERT INTO daily_digests (summary, feedback_count) VALUES (?, ?)'
 			).bind(JSON.stringify(digest), feedback.length).run();
 
-			// Log Slack payload (mock delivery)
+			// Log rich Slack payload
 			const slackPayload = {
-				text: `📊 *Daily Feedback Digest*`,
+				text: `🗄️ D1 Feedback Digest — ${today}`,
 				blocks: [
-					{
-						type: 'header',
-						text: { type: 'plain_text', text: '📊 Daily Feedback Digest' },
-					},
-					{
-						type: 'section',
-						text: {
-							type: 'mrkdwn',
-							text: `*Sentiment:* ${digest.overall_sentiment}\n*Feedback analyzed:* ${feedback.length}`,
-						},
-					},
-					{
-						type: 'section',
-						text: {
-							type: 'mrkdwn',
-							text: `*Top Themes:*\n${digest.top_themes.map(t => `• ${t}`).join('\n')}`,
-						},
-					},
-					{
-						type: 'section',
-						text: {
-							type: 'mrkdwn',
-							text: `*Recommended Actions:*\n${digest.recommended_actions.map(a => `• ${a}`).join('\n')}`,
-						},
-					},
+					{ type: 'header', text: { type: 'plain_text', text: `🗄️ D1 Feedback Digest — ${today}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*Sources:* ${sources.join(', ')}\n*Volume:* ${feedback.length} feedback items analyzed` } },
+					{ type: 'divider' },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*🔥 Top Themes*\n${digest.top_themes.map((t, i) => `${i + 1}. *${t.theme}* (${t.mentions} mentions) — Impact: ${t.impact}`).join('\n')}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*😬 Sentiment*\n😠 Frustrated: ${digest.sentiment.frustrated}%\n😐 Neutral: ${digest.sentiment.neutral}%\n😊 Positive: ${digest.sentiment.positive}%` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*💡 Feature Signals*\n${digest.feature_signals.map(f => `• ${f}`).join('\n')}` } },
+					{ type: 'section', text: { type: 'mrkdwn', text: `*✅ PM Actions*\n${digest.pm_actions.docs_ux.map(a => `• ${a}`).join('\n')}` } },
 				],
 			};
 			console.log('[SLACK] Would send:', JSON.stringify(slackPayload, null, 2));
