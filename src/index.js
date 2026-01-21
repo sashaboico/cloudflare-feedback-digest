@@ -67,6 +67,28 @@ JSON response:`;
 			});
 		}
 
+		if (url.pathname === '/latest-digest') {
+			const result = await env.DB.prepare(
+				'SELECT * FROM daily_digests ORDER BY created_at DESC LIMIT 1'
+			).first();
+
+			if (!result) {
+				return new Response(JSON.stringify({ error: 'No digests found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			return new Response(JSON.stringify({
+				id: result.id,
+				...JSON.parse(result.summary),
+				feedback_count: result.feedback_count,
+				created_at: result.created_at,
+			}, null, 2), {
+				headers: { 'Content-Type': 'application/json' },
+			});
+		}
+
 		if (url.pathname === '/db-test') {
 			// Insert sample feedback
 			await env.DB.prepare(
