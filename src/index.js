@@ -62,6 +62,39 @@ JSON response:`;
 				'INSERT INTO daily_digests (summary, feedback_count) VALUES (?, ?)'
 			).bind(JSON.stringify(digest), feedback.length).run();
 
+			// Log Slack payload (mock delivery)
+			const slackPayload = {
+				text: `📊 *Daily Feedback Digest*`,
+				blocks: [
+					{
+						type: 'header',
+						text: { type: 'plain_text', text: '📊 Daily Feedback Digest' },
+					},
+					{
+						type: 'section',
+						text: {
+							type: 'mrkdwn',
+							text: `*Sentiment:* ${digest.overall_sentiment}\n*Feedback analyzed:* ${feedback.length}`,
+						},
+					},
+					{
+						type: 'section',
+						text: {
+							type: 'mrkdwn',
+							text: `*Top Themes:*\n${digest.top_themes.map(t => `• ${t}`).join('\n')}`,
+						},
+					},
+					{
+						type: 'section',
+						text: {
+							type: 'mrkdwn',
+							text: `*Recommended Actions:*\n${digest.recommended_actions.map(a => `• ${a}`).join('\n')}`,
+						},
+					},
+				],
+			};
+			console.log('[SLACK] Would send:', JSON.stringify(slackPayload, null, 2));
+
 			return new Response(JSON.stringify(digest, null, 2), {
 				headers: { 'Content-Type': 'application/json' },
 			});
