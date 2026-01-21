@@ -235,22 +235,6 @@ JSON response:`;
 			});
 		}
 
-		if (url.pathname === '/db-test') {
-			// Insert sample feedback
-			await env.DB.prepare(
-				'INSERT INTO feedback (content, source) VALUES (?, ?)'
-			).bind('Sample feedback at ' + new Date().toISOString(), 'db-test').run();
-
-			// Get 5 most recent rows
-			const { results } = await env.DB.prepare(
-				'SELECT * FROM feedback ORDER BY created_at DESC LIMIT 5'
-			).all();
-
-			return new Response(JSON.stringify(results, null, 2), {
-				headers: { 'Content-Type': 'application/json' },
-			});
-		}
-
 		// Health check
 		return new Response('Hello World!');
 	},
