@@ -1,6 +1,7 @@
 # Daily Product Feedback Digest
 
 **Author:** Alexandra Boico
+
 **Submission:** Cloudflare PM Intern Assessment
 
 A Cloudflare Workers prototype that aggregates product feedback, analyzes it with AI, and delivers a daily digest—helping PMs quickly surface themes, sentiment, and actionable insights from noisy user feedback.
